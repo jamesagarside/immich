@@ -53,8 +53,8 @@ services:
   # Jetson Nano specific ML container
   immich-machine-learning:
     container_name: immich_machine_learning
-    image: immich-ml-jetson-nano:latest  # Built using the Jetson Nano Dockerfile
-    runtime: nvidia  # Required for GPU acceleration on Jetson
+    image: immich-ml-jetson-nano:latest # Built using the Jetson Nano Dockerfile
+    runtime: nvidia # Required for GPU acceleration on Jetson
     volumes:
       - model-cache:/cache
     environment:
@@ -68,7 +68,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3g  # Limit memory usage on Jetson Nano
+          memory: 3g # Limit memory usage on Jetson Nano
         reservations:
           memory: 512m
     ports:

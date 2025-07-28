@@ -111,7 +111,7 @@ RUN wget -q -O onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl \
     https://nvidia.box.com/shared/static/8w3y1ksblr8nml1zlyp3rg89lx5kthay.whl && \
     /opt/venv/bin/pip install onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl && \
     rm onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl
- 
+
 RUN echo "hard core 0" >> /etc/security/limits.conf && \
     echo "fs.suid_dumpable 0" >> /etc/sysctl.conf && \
     echo 'ulimit -S -c 0 > /dev/null 2>&1' >> /etc/profile

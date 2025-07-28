@@ -18,12 +18,14 @@ This build is provided as a best-effort attempt to run Immich ML on Jetson Nano 
 ## Prerequisites
 
 ### Hardware Requirements
+
 - NVIDIA Jetson Nano Developer Kit
 - JetPack 4.6.1 installed
 - At least 4GB of RAM (swap may be required)
 - MicroSD card with at least 32GB (64GB+ recommended)
 
 ### Software Requirements
+
 - Docker with nvidia-docker2 runtime
 - Git (for cloning the repository)
 
@@ -55,16 +57,19 @@ sudo docker run --rm --runtime nvidia nvidia/cuda:10.2-base-ubuntu18.04 nvidia-s
 ### Option 1: Using the Build Script (Recommended)
 
 1. Navigate to the machine-learning directory:
+
 ```bash
 cd machine-learning
 ```
 
 2. Run the build script:
+
 ```bash
 ./build-jetson-nano.sh
 ```
 
 3. Or with custom options:
+
 ```bash
 ./build-jetson-nano.sh -t v1.129.0-jetson-nano -n my-immich-ml
 ```
@@ -98,7 +103,7 @@ docker run --runtime nvidia --rm -p 3003:3003 immich-ml-jetson-nano:latest
 Add this to your `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   immich-machine-learning:
@@ -137,6 +142,7 @@ print('CUDA available:', 'CUDAExecutionProvider' in ort.get_available_providers(
 ```
 
 Expected output:
+
 ```
 WARNING: Running on Jetson Nano with onnxruntime-gpu 1.11.0 instead of required 1.17.0+
 Some ML features may not work as expected. This is a compatibility build.
@@ -172,6 +178,7 @@ docker rm immich-ml-test
 Jetson Nano has limited memory. Consider:
 
 1. **Enable swap**:
+
 ```bash
 sudo fallocate -l 4G /swapfile
 sudo chmod 600 /swapfile
@@ -181,6 +188,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 ```
 
 2. **Increase GPU memory split**:
+
 ```bash
 # Edit /boot/extlinux/extlinux.conf and add to APPEND line:
 # nvdec_mem=1G
@@ -207,15 +215,18 @@ services:
 ### Common Issues
 
 1. **Out of memory errors**:
+
    - Enable swap (see above)
    - Reduce batch sizes in Immich ML configuration
    - Use CPU-only mode: `DEVICE=cpu`
 
 2. **CUDA errors**:
+
    - Verify nvidia-docker2 is installed: `docker run --rm --runtime nvidia nvidia/cuda:10.2-base-ubuntu18.04 nvidia-smi`
    - Check JetPack version: `sudo apt-cache show nvidia-jetpack`
 
 3. **Model loading failures**:
+
    - Some newer models may not be compatible with onnxruntime 1.11.0
    - Check Immich logs for specific model errors
    - Consider disabling problematic ML features in Immich

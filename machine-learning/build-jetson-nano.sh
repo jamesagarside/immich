@@ -27,7 +27,7 @@ fi
 IMAGE_NAME="immich-ml-jetson-nano"
 TAG="latest"
 DEVICE="cuda"
-DOCKERFILE="Dockerfile.jetson-nano"
+DOCKERFILE="Dockerfile.jetson-nano-simple"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do

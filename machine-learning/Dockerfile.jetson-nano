@@ -1,7 +1,8 @@
 ARG DEVICE=cuda
 
-# For Jetson Nano - JetPack 4.6.1 (l4t-base:32.7.1)
-FROM nvcr.io/nvidia/l4t-base:32.7.1 AS builder
+# For Jetson Nano - JetPack 4.6.1 (using Ubuntu 18.04 base)
+# Note: Using ubuntu:18.04 as base since specific l4t images may not be available
+FROM ubuntu:18.04 AS builder
 
 ARG DEVICE
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,11 +17,11 @@ RUN apt-get update && \
     wget \
     curl \
     ca-certificates \
+    software-properties-common \
     python3.6 \
     python3.6-dev \
-    python3-venv \
+    python3.6-venv \
     python3-pip \
-    libcudnn8-dev \
     libhdf5-serial-dev \
     hdf5-tools \
     libhdf5-dev \
@@ -72,14 +73,14 @@ RUN /opt/venv/bin/pip install \
     echo "Some packages may have failed to install due to version compatibility"
 
 # runtime stage for Jetson Nano
-FROM nvcr.io/nvidia/l4t-cuda:10.2.460-runtime-ubuntu18.04
+FROM ubuntu:18.04
 
 # Install runtime dependencies for JetPack 4.6.1
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    software-properties-common \
     python3.6 \
     python3-pip \
-    libcudnn8-dev \
     libhdf5-serial-dev \
     hdf5-tools \
     libhdf5-dev \
@@ -92,8 +93,10 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Set CUDA 10.2 environment for Jetson Nano
-ENV LD_LIBRARY_PATH=/usr/local/cuda-10.2/lib64:$LD_LIBRARY_PATH \
+# Note: CUDA libraries will be mounted from host via nvidia-docker runtime
+
+# Set CUDA 10.2 environment for Jetson Nano (libraries provided by nvidia-docker)
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
@@ -109,7 +112,7 @@ RUN wget -q -O onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl \
     https://nvidia.box.com/shared/static/8w3y1ksblr8nml1zlyp3rg89lx5kthay.whl && \
     /opt/venv/bin/pip install onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl && \
     rm onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl
- 
+
 RUN echo "hard core 0" >> /etc/security/limits.conf && \
     echo "fs.suid_dumpable 0" >> /etc/sysctl.conf && \
     echo 'ulimit -S -c 0 > /dev/null 2>&1' >> /etc/profile

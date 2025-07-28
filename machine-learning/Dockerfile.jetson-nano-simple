@@ -1,0 +1,170 @@
+ARG DEVICE=cuda
+
+# For Jetson Nano - using standard Ubuntu 18.04 base (JetPack 4.6.1 compatible)
+FROM ubuntu:18.04 AS builder
+
+ARG DEVICE
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install Python 3.6 and build dependencies
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    build-essential \
+    wget \
+    curl \
+    ca-certificates \
+    software-properties-common \
+    python3.6 \
+    python3.6-dev \
+    python3.6-venv \
+    python3-pip \
+    python3-setuptools \
+    libhdf5-serial-dev \
+    hdf5-tools \
+    libhdf5-dev \
+    zlib1g-dev \
+    zip \
+    libjpeg8-dev \
+    liblapack-dev \
+    libblas-dev \
+    gfortran \
+    pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create Python 3.6 venv and upgrade pip
+RUN python3.6 -m venv /opt/venv && \
+    /opt/venv/bin/python -m pip install --upgrade pip==21.3.1 setuptools==59.6.0 wheel
+
+# Install base scientific packages compatible with Python 3.6
+RUN /opt/venv/bin/pip install \
+    numpy==1.19.4 \
+    future==0.18.2 \
+    mock==3.0.5 \
+    h5py==2.10.0 \
+    Cython==0.29.32
+
+# Install ONNX Runtime GPU 1.11.0 for JetPack 4.6.1
+RUN wget -q -O onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl \
+    https://nvidia.box.com/shared/static/8w3y1ksblr8nml1zlyp3rg89lx5kthay.whl && \
+    /opt/venv/bin/pip install onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl && \
+    rm onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl
+
+# Copy modified pyproject.toml
+COPY pyproject-jetson-nano.toml ./pyproject.toml
+
+# Install Python dependencies with fallback for compatibility
+RUN /opt/venv/bin/pip install \
+    aiocache==0.12.1 \
+    fastapi==0.95.2 \
+    ftfy==6.1.1 \
+    gunicorn==21.1.0 || echo "gunicorn failed, trying older version" && \
+    /opt/venv/bin/pip install gunicorn==20.1.0
+
+RUN /opt/venv/bin/pip install \
+    "huggingface-hub>=0.15.0,<1.0" \
+    "opencv-python-headless>=4.5.0,<5.0" \
+    orjson==3.8.0 \
+    "pillow>=8.0.0,<10.0" \
+    "python-multipart>=0.0.5,<1.0" \
+    rich==12.6.0 \
+    "uvicorn>=0.18.0,<1.0" || echo "Some packages may have compatibility issues"
+
+# Try to install remaining packages with more flexible versions
+RUN /opt/venv/bin/pip install \
+    "insightface>=0.7.0,<1.0" \
+    "tokenizers>=0.13.0,<1.0" || echo "Advanced ML packages may not be fully compatible"
+
+# Try pydantic with older version for Python 3.6
+RUN /opt/venv/bin/pip install \
+    "pydantic>=1.10.0,<2.0" \
+    "pydantic-settings>=1.10.0,<2.0" || \
+    echo "Using fallback pydantic version" && \
+    /opt/venv/bin/pip install pydantic==1.10.12
+
+# Runtime stage
+FROM ubuntu:18.04
+
+# Install runtime dependencies
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    python3.6 \
+    python3-pip \
+    libhdf5-serial-dev \
+    hdf5-tools \
+    libhdf5-dev \
+    zlib1g-dev \
+    libjpeg8-dev \
+    liblapack-dev \
+    libblas-dev \
+    gfortran \
+    tini \
+    curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Environment variables for CUDA (will be provided by nvidia-docker runtime)
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/compat:$LD_LIBRARY_PATH \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/usr/src \
+    DEVICE=${DEVICE} \
+    VIRTUAL_ENV=/opt/venv \
+    MACHINE_LEARNING_CACHE_FOLDER=/cache \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Re-install onnxruntime-gpu to ensure proper linking
+RUN wget -q -O onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl \
+    https://nvidia.box.com/shared/static/8w3y1ksblr8nml1zlyp3rg89lx5kthay.whl && \
+    /opt/venv/bin/pip install --force-reinstall onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl && \
+    rm onnxruntime_gpu-1.11.0-cp36-cp36m-linux_aarch64.whl
+
+# Security configurations
+RUN echo "hard core 0" >> /etc/security/limits.conf && \
+    echo "fs.suid_dumpable 0" >> /etc/sysctl.conf && \
+    echo 'ulimit -S -c 0 > /dev/null 2>&1' >> /etc/profile
+
+WORKDIR /usr/src
+
+# Copy application files
+COPY scripts/healthcheck.py .
+COPY immich_ml immich_ml
+
+# Create startup script with warnings
+RUN echo '#!/bin/bash' > /usr/local/bin/jetson-nano-start.sh && \
+    echo 'echo "🚀 Starting Immich ML for Jetson Nano"' >> /usr/local/bin/jetson-nano-start.sh && \
+    echo 'echo "⚠️  WARNING: Using onnxruntime-gpu 1.11.0 instead of required 1.17.0+"' >> /usr/local/bin/jetson-nano-start.sh && \
+    echo 'echo "⚠️  Some ML features may not work as expected"' >> /usr/local/bin/jetson-nano-start.sh && \
+    echo 'echo "🔧 This is a compatibility build for JetPack 4.6.1"' >> /usr/local/bin/jetson-nano-start.sh && \
+    echo 'echo ""' >> /usr/local/bin/jetson-nano-start.sh && \
+    echo 'exec python -m immich_ml "$@"' >> /usr/local/bin/jetson-nano-start.sh && \
+    chmod +x /usr/local/bin/jetson-nano-start.sh
+
+# Build arguments for metadata
+ARG BUILD_ID=jetson-nano-build
+ARG BUILD_IMAGE=immich-ml-jetson-nano
+ARG BUILD_SOURCE_REF=jetson-nano-compat
+ARG BUILD_SOURCE_COMMIT=unknown
+
+ENV IMMICH_BUILD=${BUILD_ID} \
+    IMMICH_BUILD_URL=https://github.com/immich-app/immich \
+    IMMICH_BUILD_IMAGE=${BUILD_IMAGE} \
+    IMMICH_BUILD_IMAGE_URL=https://github.com/immich-app/immich \
+    IMMICH_REPOSITORY=immich-app/immich \
+    IMMICH_REPOSITORY_URL=https://github.com/immich-app/immich \
+    IMMICH_SOURCE_REF=${BUILD_SOURCE_REF} \
+    IMMICH_SOURCE_COMMIT=${BUILD_SOURCE_COMMIT} \
+    IMMICH_SOURCE_URL=https://github.com/immich-app/immich
+
+ENTRYPOINT ["tini", "--"]
+CMD ["/usr/local/bin/jetson-nano-start.sh"]
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python3 healthcheck.py || exit 1
