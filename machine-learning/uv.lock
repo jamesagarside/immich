@@ -980,9 +980,6 @@ armnn = [
 cpu = [
     { name = "onnxruntime" },
 ]
-cuda = [
-    { name = "onnxruntime-gpu" },
-]
 openvino = [
     { name = "onnxruntime-openvino" },
 ]
@@ -1044,7 +1041,6 @@ requires-dist = [
     { name = "onnxruntime", marker = "extra == 'armnn'", specifier = ">=1.15.0,<2" },
     { name = "onnxruntime", marker = "extra == 'cpu'", specifier = ">=1.15.0,<2" },
     { name = "onnxruntime", marker = "extra == 'rknn'", specifier = ">=1.15.0,<2" },
-    { name = "onnxruntime-gpu", marker = "extra == 'cuda'", specifier = ">=1.17.0,<2", index = "https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple" },
     { name = "onnxruntime-openvino", marker = "extra == 'openvino'", specifier = ">=1.17.1,<1.19.0" },
     { name = "opencv-python-headless", specifier = ">=4.7.0.72,<5.0" },
     { name = "orjson", specifier = ">=3.9.5" },
