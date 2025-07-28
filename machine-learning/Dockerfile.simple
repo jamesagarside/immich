@@ -1,0 +1,33 @@
+FROM ubuntu:18.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install only essential packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.6 \
+    python3.6-venv \
+    python3-pip \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create venv and install minimal packages
+RUN python3.6 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install fastapi uvicorn
+
+# Install ONNX Runtime for Jetson
+RUN wget -q -O onnx.whl \
+    https://nvidia.box.com/shared/static/8w3y1ksblr8nml1zlyp3rg89lx5kthay.whl && \
+    /opt/venv/bin/pip install onnx.whl && \
+    rm onnx.whl
+
+WORKDIR /app
+COPY immich_ml ./immich_ml
+
+# Create simple start script
+RUN echo '#!/bin/bash\necho "Jetson Nano ML starting..."\ncd /app\nexec python -m immich_ml' > start.sh && chmod +x start.sh
+
+EXPOSE 3003
+CMD ["./start.sh"]

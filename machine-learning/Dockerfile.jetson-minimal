@@ -21,7 +21,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     wget \
     curl \
-    tini \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -61,7 +60,6 @@ RUN echo 'import sys; sys.exit(0)' > /healthcheck.py
 
 EXPOSE 3003
 
-ENTRYPOINT ["tini", "--"]
 CMD ["/start.sh"]
 
 HEALTHCHECK CMD python3 /healthcheck.py
