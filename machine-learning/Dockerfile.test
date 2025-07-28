@@ -1,0 +1,25 @@
+FROM ubuntu:18.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install only essential packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.6 \
+    python3.6-venv \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create venv and install minimal packages
+RUN python3.6 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install fastapi uvicorn
+
+WORKDIR /app
+
+# Create a minimal test app instead of copying immich_ml for now
+RUN echo 'from fastapi import FastAPI\napp = FastAPI()\n@app.get("/")\ndef root(): return {"status": "Jetson Nano ML container running"}\n@app.get("/ping")\ndef ping(): return {"pong": True}\nif __name__ == "__main__": import uvicorn; uvicorn.run(app, host="0.0.0.0", port=3003)' > main.py
+
+EXPOSE 3003
+CMD ["python", "main.py"]
